@@ -1,5 +1,6 @@
 # import the pygame module, so you can use it
 import pygame
+import Source.game as game
 
 
 # define a main function
@@ -26,9 +27,10 @@ def main():
                 # change the value to False, to exit the main loop
                 running = False
 
-
 # run the main function only if this module is executed as the main script
 # (if you import this as a module then nothing is executed)
 if __name__ == "__main__":
+    # TEST
+    level = game.Level(11, 9)
     # call the main function
-    main()
+    #main()
