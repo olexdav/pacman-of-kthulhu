@@ -167,7 +167,8 @@ class PacMan(pygame.sprite.Sprite):
         # Call the parent's constructor
         pygame.sprite.Sprite.__init__(self)
         # load image
-        self.image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
+        self.pacman_image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
+        self.image = self.pacman_image
         self.rect = self.image.get_rect()
         self.rect.left = tile_x * TILE_SIZE
         self.rect.top = tile_y * TILE_SIZE
@@ -184,6 +185,7 @@ class PacMan(pygame.sprite.Sprite):
             if self.planned_moves:
                 self.curr_move = self.planned_moves.pop(0)
                 self.move_frame = 0
+                self.rotate_towards_direction(self.curr_move)
         # update position based on movement
         if self.curr_move:
             self.move_frame += 1
@@ -204,6 +206,10 @@ class PacMan(pygame.sprite.Sprite):
                     self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
                                                                   coin.tile_x, coin.tile_y)
                     break  # only try to eat the first coin on the list (for now)
+
+    def rotate_towards_direction(self, direction):
+        angles = {(0, 1): 0, (0, -1): 180, (-1, 0): 90, (1, 0): 270}
+        self.image = pygame.transform.rotate(self.pacman_image, angles[direction])
 
 
 class Coin(pygame.sprite.Sprite):
