@@ -2,6 +2,9 @@
 import pygame
 import Source.game as game
 
+LEVEL_WIDTH = 19
+LEVEL_HEIGHT = 11
+
 
 # define a main function
 def main():
@@ -12,8 +15,17 @@ def main():
     pygame.display.set_icon(logo)
     pygame.display.set_caption("PacMan of Kthulhu")
 
-    # create a surface on screen that has the size of 240 x 180
-    screen = pygame.display.set_mode((800, 600))
+    # create a surface on screen that fits the size of the map
+    screen = pygame.display.set_mode((LEVEL_WIDTH*game.TILE_SIZE,
+                                      LEVEL_HEIGHT*game.TILE_SIZE))
+
+    # create level
+    level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT)
+    # get tile sprites
+    tile_list = level.set_up_tile_sprites()
+
+    # game clock
+    clock = pygame.time.Clock()
 
     # define a variable to control the main loop
     running = True
@@ -26,11 +38,14 @@ def main():
             if event.type == pygame.QUIT:
                 # change the value to False, to exit the main loop
                 running = False
+        # draw everything
+        screen.fill((0, 0, 0))  # fill with black
+        tile_list.draw(screen)
+        pygame.display.flip()
+        clock.tick(30)
 
 # run the main function only if this module is executed as the main script
 # (if you import this as a module then nothing is executed)
 if __name__ == "__main__":
-    # TEST
-    level = game.Level(11, 9)
     # call the main function
-    #main()
+    main()

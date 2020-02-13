@@ -1,6 +1,25 @@
 import numpy as np
 from random import shuffle
+import pygame
 
+TILE_SIZE = 60
+
+
+class Tile(pygame.sprite.Sprite):
+    def __init__(self, type, grid_x, grid_y):
+        # Call the parent's constructor
+        pygame.sprite.Sprite.__init__(self)
+        # load image based on tile type
+        filename = None
+        if type == 0:
+            filename = "Assets/Images/Star_Back.png"
+        elif type == 1:
+            filename = "Assets/Images/Star_Wall.png"
+        self.image = pygame.image.load(filename).convert()
+        # move tile to the proper location on the grid
+        self.rect = self.image.get_rect()
+        self.rect.top = TILE_SIZE * grid_y
+        self.rect.left = TILE_SIZE * grid_x
 
 class Level:
     # width, height should be odd
@@ -10,8 +29,6 @@ class Level:
         self.player_spawn_point = (height//2, width//2)
         self.tile_map = None
         self.generate_tile_map()
-        # TEST
-        print(self.tile_map)
 
     # generates a tile map in-place
     def generate_tile_map(self):
@@ -42,7 +59,7 @@ class Level:
                 tile_map[location_y + y, location_x + x] = 0
 
     # add walls to the maze, making sure that there is always a path between 2 points
-    def add_random_walls(self, chance=0.7):
+    def add_random_walls(self, chance=0.5):
         # create list of points
         points = []
         for x in range(2, self.width-1, 2):
@@ -54,15 +71,13 @@ class Level:
         shuffle(points)
         for y, x in points:
             # add wall if it doesn't obstruct movement
-            print("Attempting wall", x, y)
             if self.can_place_wall(y, x):
-                print("Success!")
                 if np.random.random_sample() < chance:  # not always
                     self.tile_map[y, x] = 1
 
     # a wall can be placed if it doesn't block passage between any 2 points in the maze
     def can_place_wall(self, wall_y, wall_x):
-        if self.tile_map[wall_y, wall_x] == 1: # wall is already there
+        if self.tile_map[wall_y, wall_x] == 1:  # wall is already there
             return True
         self.tile_map[wall_y, wall_x] = 1  # imagine there is a wall
         get_adjacent = lambda y, x: [(y, x+1), (y, x-1), (y-1, x), (y+1, x)]  # right, left, up, down
@@ -91,6 +106,15 @@ class Level:
                     break
         self.tile_map[wall_y, wall_x] = 0  # remove the hypothetical wall
         return answer
+
+    # get a list of sprites for rendering
+    def set_up_tile_sprites(self):
+        tile_list = pygame.sprite.RenderPlain()
+        for x in range(self.width):
+            for y in range(self.height):
+                tile_type = self.tile_map[y, x]
+                tile_list.add(Tile(tile_type, x, y))
+        return tile_list
 
 class PacMan:
     def __init__(self):
