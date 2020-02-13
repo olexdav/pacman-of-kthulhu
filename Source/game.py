@@ -31,6 +31,7 @@ class Level:
         self.player_spawn_point = (height // 2, width // 2)
         self.tile_map = None
         self.generate_tile_map()
+        self.score = 0
 
     # generates a tile map in-place
     def generate_tile_map(self):
@@ -202,6 +203,7 @@ class PacMan(pygame.sprite.Sprite):
                 # if pacman is on top of the coin, consume it immediately
                 if self.curr_tile_x == coin.tile_x and self.curr_tile_y == coin.tile_y:
                     coin.kill()  # devour the coin
+                    level.score += 10 # claim some points
                 else:  # try to reach the coin
                     self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
                                                                   coin.tile_x, coin.tile_y)

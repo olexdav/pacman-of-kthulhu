@@ -1,15 +1,25 @@
 # import the pygame module, so you can use it
 import pygame
+import pygame.freetype
 import Source.game as game
 
 LEVEL_WIDTH = 19
 LEVEL_HEIGHT = 11
 
 
+def draw_score(screen, score):
+    score_string = "SCORE:" + str(score).zfill(4)
+    POKEFONT = pygame.freetype.Font("Assets/Fonts/PokemonGb.ttf", 32)
+    text, text_rect = POKEFONT.render(score_string, (255, 255, 255))
+    text_rect.top = 14
+    text_rect.left = 14
+    screen.blit(text, text_rect)
+
 # define a main function
 def main():
     # initialize the pygame module
     pygame.init()
+    pygame.font.init()
     # load and set the logo
     logo = pygame.image.load("Assets/Images/unicorn-logo.png")
     pygame.display.set_icon(logo)
@@ -61,8 +71,10 @@ def main():
         tile_list.draw(screen)
         coins_list.draw(screen)
         characters_list.draw(screen)
+        draw_score(screen, level.score)
         pygame.display.flip()
         clock.tick(60)
+
 
 # run the main function only if this module is executed as the main script
 # (if you import this as a module then nothing is executed)
