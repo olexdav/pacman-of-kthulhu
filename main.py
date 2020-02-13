@@ -23,6 +23,9 @@ def main():
     level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT)
     # get tile sprites
     tile_list = level.set_up_tile_sprites()
+    pacman = game.PacMan()
+    characters_list = pygame.sprite.RenderPlain()
+    characters_list.add(pacman)
 
     # game clock
     clock = pygame.time.Clock()
@@ -41,6 +44,7 @@ def main():
         # draw everything
         screen.fill((0, 0, 0))  # fill with black
         tile_list.draw(screen)
+        characters_list.draw(screen)
         pygame.display.flip()
         clock.tick(30)
 

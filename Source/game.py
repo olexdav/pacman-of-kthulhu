@@ -21,6 +21,7 @@ class Tile(pygame.sprite.Sprite):
         self.rect.top = TILE_SIZE * grid_y
         self.rect.left = TILE_SIZE * grid_x
 
+
 class Level:
     # width, height should be odd
     def __init__(self, width, height):
@@ -116,6 +117,11 @@ class Level:
                 tile_list.add(Tile(tile_type, x, y))
         return tile_list
 
-class PacMan:
+
+class PacMan(pygame.sprite.Sprite):
     def __init__(self):
-        pass
+        # Call the parent's constructor
+        pygame.sprite.Sprite.__init__(self)
+        # load image
+        self.image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
+        self.rect = self.image.get_rect()
