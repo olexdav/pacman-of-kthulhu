@@ -23,9 +23,11 @@ def main():
     level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT)
     # get tile sprites
     tile_list = level.set_up_tile_sprites()
-    pacman = game.PacMan()
+    pacman = game.PacMan(LEVEL_WIDTH // 2, LEVEL_HEIGHT // 2)
+    # create lists of all game objects
     characters_list = pygame.sprite.RenderPlain()
     characters_list.add(pacman)
+    objects_list = pygame.sprite.RenderPlain()
 
     # game clock
     clock = pygame.time.Clock()
@@ -41,12 +43,24 @@ def main():
             if event.type == pygame.QUIT:
                 # change the value to False, to exit the main loop
                 running = False
+            # place coins on mouse clicks
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                tile_x, tile_y = mouse_x // game.TILE_SIZE, mouse_y // game.TILE_SIZE
+                if level.tile_map[tile_y, tile_x] == 0:  # only place coins in empty corridors
+                    coin = game.Coin(tile_x, tile_y)
+                    objects_list.add(coin)
+                # clicked_tiles = [s for s in tile_list if s.rect.collidepoint(mouse_pos)]
+
+        # update game logic
+        objects_list.update()
+
         # draw everything
-        screen.fill((0, 0, 0))  # fill with black
         tile_list.draw(screen)
         characters_list.draw(screen)
+        objects_list.draw(screen)
         pygame.display.flip()
-        clock.tick(30)
+        clock.tick(60)
 
 # run the main function only if this module is executed as the main script
 # (if you import this as a module then nothing is executed)

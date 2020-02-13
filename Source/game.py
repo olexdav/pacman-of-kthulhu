@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from random import shuffle
 import pygame
@@ -119,9 +120,38 @@ class Level:
 
 
 class PacMan(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, tile_x, tile_y):
         # Call the parent's constructor
         pygame.sprite.Sprite.__init__(self)
         # load image
         self.image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
         self.rect = self.image.get_rect()
+        self.rect.left = tile_x * TILE_SIZE
+        self.rect.top = tile_y * TILE_SIZE
+
+
+class Coin(pygame.sprite.Sprite):
+    def __init__(self, tile_x, tile_y):
+        # Call the parent's constructor
+        pygame.sprite.Sprite.__init__(self)
+        # load image
+        path = "Assets/Images/coin"
+        self.images = []
+        for file_name in os.listdir(path):
+            image = pygame.image.load(path + os.sep + file_name).convert_alpha()
+            self.images.append(image)
+        self.index = 0
+        self.image = self.images[self.index]
+        self.animation_frames = 6  # how many frames each image in the animation will last
+        self.current_frame = 0
+        # place in the center of a tile
+        self.rect = self.image.get_rect()
+        self.rect.left = tile_x * TILE_SIZE + TILE_SIZE // 2 - 6
+        self.rect.top = tile_y * TILE_SIZE + TILE_SIZE // 2 - 8
+
+    def update(self):
+        self.current_frame += 1
+        if self.current_frame >= self.animation_frames:  # update animation every few frames
+            self.current_frame = 0
+            self.index = (self.index + 1) % len(self.images)
+            self.image = self.images[self.index]
