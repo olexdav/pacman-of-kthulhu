@@ -1,12 +1,12 @@
-# import the pygame module, so you can use it
+import os
 import pygame
 import pygame.freetype
 import Source.game as game
 
-LEVEL_WIDTH = 19
-LEVEL_HEIGHT = 11
-GAME_MODE = "Pathfinding"
-# GAME_MODE = "Game"
+LEVEL_WIDTH = 21
+LEVEL_HEIGHT = 13
+# GAME_MODE = "Pathfinding"
+GAME_MODE = "Game"
 
 
 def draw_score(screen, score):
@@ -19,6 +19,8 @@ def draw_score(screen, score):
 
 # define a main function
 def main():
+    # move window to upper left corner
+    os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (0, 32)
     # initialize the pygame module
     pygame.init()
     pygame.font.init()
@@ -32,17 +34,17 @@ def main():
                                       LEVEL_HEIGHT*game.TILE_SIZE))
 
     # create level
-    level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=5)
+    level = None
+    if GAME_MODE == "Pathfinding":
+        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=0, ghosts_n_coins=False)
+    elif GAME_MODE == "Game":
+        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=5, ghosts_n_coins=True)
     # get tile sprites
     tile_list = level.set_up_tile_sprites()
+    # create pacman
     pacman = game.PacMan(LEVEL_WIDTH // 2, LEVEL_HEIGHT // 2)
-    # create lists of all game objects
     pacman_list = pygame.sprite.RenderPlain()
     pacman_list.add(pacman)
-    ghosts_list = pygame.sprite.RenderPlain()
-    for ghost in level.ghosts:
-        ghosts_list.add(ghost)
-    coins_list = pygame.sprite.RenderPlain()
 
     # game clock
     clock = pygame.time.Clock()
@@ -58,25 +60,23 @@ def main():
             if event.type == pygame.QUIT:
                 # change the value to False, to exit the main loop
                 running = False
-            # place coins on mouse clicks
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            # place coins on mouse clicks (only in pathfinding mode)
+            elif event.type == pygame.MOUSEBUTTONDOWN and GAME_MODE == "Pathfinding":
                 mouse_x, mouse_y = pygame.mouse.get_pos()
                 tile_x, tile_y = mouse_x // game.TILE_SIZE, mouse_y // game.TILE_SIZE
                 if level.tile_map[tile_y, tile_x] == 0:  # only place coins in empty corridors
-                    coin = game.Coin(tile_x, tile_y)
-                    coins_list.add(coin)
+                    level.add_coin(tile_x, tile_y)
                 # clicked_tiles = [s for s in tile_list if s.rect.collidepoint(mouse_pos)]
 
         # update game logic
-        #characters_list.update()
-        pacman.update(level, coins_list)
-        coins_list.update()
+        pacman.update(level)
+        level.update()
 
         # draw everything
         tile_list.draw(screen)
-        coins_list.draw(screen)
+        level.coins.draw(screen)
         pacman_list.draw(screen)
-        ghosts_list.draw(screen)
+        level.ghosts.draw(screen)
         draw_score(screen, level.score)
         pygame.display.flip()
         clock.tick(60)

@@ -38,16 +38,22 @@ difficulty_settings = {
 
 class Level:
     # width, height should be odd
-    def __init__(self, width, height, difficulty=0):
+    def __init__(self, width, height, difficulty=0, ghosts_n_coins=True):
         self.width = width
         self.height = height
         self.player_spawn_point = (height // 2, width // 2)
         self.difficulty = difficulty
         self.tile_map = None
         self.generate_tile_map()
-        self.ghosts = []
-        self.add_ghosts()
+        self.ghosts = pygame.sprite.RenderPlain()
+        self.coins = pygame.sprite.RenderPlain()
+        if ghosts_n_coins:
+            self.add_ghosts()
+            self.place_coins()
         self.score = 0
+
+    def update(self):
+        self.coins.update()
 
     # generates a tile map in-place
     def generate_tile_map(self):
@@ -186,7 +192,7 @@ class Level:
         spawn_points = self.get_random_locations_in_corners(ghost_amount)
         for spawn_y, spawn_x in spawn_points:
             ghost = Ghost(spawn_x, spawn_y, ghost_frames_per_tile)
-            self.ghosts.append(ghost)
+            self.ghosts.add(ghost)
 
     # get up to 4 random locations in different corners of the map
     def get_random_locations_in_corners(self, points_amount=4):
@@ -202,6 +208,27 @@ class Level:
             points.append(point)
         shuffle(points)
         return points[:points_amount]
+
+    # places coins all over the map, except for the spawn point
+    def place_coins(self):
+        center_x, center_y = self.width // 2, self.height // 2
+        for x in range(1, self.width - 1):
+            for y in range(1, self.height - 1):
+                if abs(center_x - x) > 1 or abs(center_y - y) > 1: # exclude spawn point
+                    self.add_coin(x, y)
+                    #if self.tile_map[y, x] == 0:
+                    #    self.coins.add(Coin(x, y))
+
+    def add_coin(self, tile_x, tile_y):
+        if self.tile_map[tile_y, tile_x] == 0:  # place coins in empty corridors
+            # check that the new coin does not intersect with other coins
+            intersect = False
+            for coin in self.coins:
+                if coin.tile_y == tile_y and coin.tile_x == tile_x:
+                    intersect = True
+                    break
+            if not intersect:
+                self.coins.add(Coin(tile_x, tile_y))
 
 class Character(pygame.sprite.Sprite):
     def __init__(self, tile_x, tile_y):
@@ -245,13 +272,13 @@ class PacMan(Character):
         # movement
         self.move_frames = 20  # how many frames it takes to move one cell
 
-    def update(self, level, coins):
+    def update(self, level):
         self.move()
         if self.curr_move:  # rotate sprite towards movement
             self.rotate_towards_direction(self.curr_move)
         # movement finished: search for new targets
-        if not self.curr_move and not self.planned_moves and coins:
-            for coin in coins:
+        if not self.curr_move and not self.planned_moves and level.coins:
+            for coin in level.coins:
                 # if pacman is on top of the coin, consume it immediately
                 if self.curr_tile_x == coin.tile_x and self.curr_tile_y == coin.tile_y:
                     coin.kill()  # devour the coin
@@ -293,7 +320,7 @@ class Coin(pygame.sprite.Sprite):
             image = pygame.image.load(path + os.sep + file_name).convert_alpha()
             self.images.append(image)
         # set up animation
-        self.index = 0
+        self.index = randint(0, len(self.images)-1)  # random animation index
         self.image = self.images[self.index]
         self.animation_frames = 6  # how many frames each image in the animation will last
         self.current_frame = 0
