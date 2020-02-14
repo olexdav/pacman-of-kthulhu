@@ -5,12 +5,14 @@ import Source.game as game
 
 LEVEL_WIDTH = 19
 LEVEL_HEIGHT = 11
+GAME_MODE = "Pathfinding"
+# GAME_MODE = "Game"
 
 
 def draw_score(screen, score):
     score_string = "SCORE:" + str(score).zfill(4)
-    POKEFONT = pygame.freetype.Font("Assets/Fonts/PokemonGb.ttf", 32)
-    text, text_rect = POKEFONT.render(score_string, (255, 255, 255))
+    font = pygame.freetype.Font("Assets/Fonts/PokemonGb.ttf", 32)
+    text, text_rect = font.render(score_string, (255, 255, 255))
     text_rect.top = 14
     text_rect.left = 14
     screen.blit(text, text_rect)
@@ -30,13 +32,16 @@ def main():
                                       LEVEL_HEIGHT*game.TILE_SIZE))
 
     # create level
-    level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT)
+    level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=5)
     # get tile sprites
     tile_list = level.set_up_tile_sprites()
     pacman = game.PacMan(LEVEL_WIDTH // 2, LEVEL_HEIGHT // 2)
     # create lists of all game objects
-    characters_list = pygame.sprite.RenderPlain()
-    characters_list.add(pacman)
+    pacman_list = pygame.sprite.RenderPlain()
+    pacman_list.add(pacman)
+    ghosts_list = pygame.sprite.RenderPlain()
+    for ghost in level.ghosts:
+        ghosts_list.add(ghost)
     coins_list = pygame.sprite.RenderPlain()
 
     # game clock
@@ -70,7 +75,8 @@ def main():
         # draw everything
         tile_list.draw(screen)
         coins_list.draw(screen)
-        characters_list.draw(screen)
+        pacman_list.draw(screen)
+        ghosts_list.draw(screen)
         draw_score(screen, level.score)
         pygame.display.flip()
         clock.tick(60)

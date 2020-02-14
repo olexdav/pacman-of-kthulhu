@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from random import shuffle
+from random import randint
 import pygame
 
 TILE_SIZE = 60
@@ -23,14 +24,29 @@ class Tile(pygame.sprite.Sprite):
         self.rect.left = TILE_SIZE * grid_x
 
 
+# parameters that dictate how hard the game becomes at each difficulty level
+difficulty_settings = {
+    0: {"ghost_frames_per_tile": 25, "ghost_amount": 1},
+    1: {"ghost_frames_per_tile": 25, "ghost_amount": 2},
+    2: {"ghost_frames_per_tile": 22, "ghost_amount": 2},
+    3: {"ghost_frames_per_tile": 25, "ghost_amount": 3},
+    4: {"ghost_frames_per_tile": 23, "ghost_amount": 3},
+    5: {"ghost_frames_per_tile": 21, "ghost_amount": 3},
+    6: {"ghost_frames_per_tile": 19, "ghost_amount": 3},
+}
+
+
 class Level:
     # width, height should be odd
-    def __init__(self, width, height):
+    def __init__(self, width, height, difficulty=0):
         self.width = width
         self.height = height
         self.player_spawn_point = (height // 2, width // 2)
+        self.difficulty = difficulty
         self.tile_map = None
         self.generate_tile_map()
+        self.ghosts = []
+        self.add_ghosts()
         self.score = 0
 
     # generates a tile map in-place
@@ -162,31 +178,48 @@ class Level:
     def shortest_path_a_star(self, x1, y1, x2, y2):
         pass
 
+    def add_ghosts(self):
+        params = difficulty_settings[self.difficulty]
+        ghost_frames_per_tile = params["ghost_frames_per_tile"]
+        ghost_amount = params["ghost_amount"]
+        # pick random locations away from the center of the maze
+        spawn_points = self.get_random_locations_in_corners(ghost_amount)
+        for spawn_y, spawn_x in spawn_points:
+            ghost = Ghost(spawn_x, spawn_y, ghost_frames_per_tile)
+            self.ghosts.append(ghost)
 
-class PacMan(pygame.sprite.Sprite):
+    # get up to 4 random locations in different corners of the map
+    def get_random_locations_in_corners(self, points_amount=4):
+        quadrant_w, quadrant_h = self.width // 4, self.height // 4
+        x_right = (self.width * 3) // 4 - 1
+        y_bottom = (self.height * 3) // 4 - 1
+        quadrant_topleft_points = [(1, 1), (1, x_right), (y_bottom, 1), (y_bottom, x_right)]
+        points = []
+        for qy, qx in quadrant_topleft_points:
+            point = 0, 0
+            while self.tile_map[point[0], point[1]] != 0:  # find a random empty tile in quadrant
+                point = qy + randint(0, quadrant_h-1), qx + randint(0, quadrant_w-1)
+            points.append(point)
+        shuffle(points)
+        return points[:points_amount]
+
+class Character(pygame.sprite.Sprite):
     def __init__(self, tile_x, tile_y):
         # Call the parent's constructor
         pygame.sprite.Sprite.__init__(self)
-        # load image
-        self.pacman_image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
-        self.image = self.pacman_image
-        self.rect = self.image.get_rect()
-        self.rect.left = tile_x * TILE_SIZE
-        self.rect.top = tile_y * TILE_SIZE
         # movement
         self.curr_tile_x, self.curr_tile_y = tile_x, tile_y
-        self.move_frames = 20  # how many frames it takes to move one cell
         self.move_frame = 0
         self.curr_move = None  # current direction of movement
         self.planned_moves = []
 
-    def update(self, level, coins):
+    # updates movement for 1 frame, following and executing planned_moves
+    def move(self):
         # fetch a move from the queue
         if not self.curr_move:
             if self.planned_moves:
                 self.curr_move = self.planned_moves.pop(0)
                 self.move_frame = 0
-                self.rotate_towards_direction(self.curr_move)
         # update position based on movement
         if self.curr_move:
             self.move_frame += 1
@@ -197,13 +230,32 @@ class PacMan(pygame.sprite.Sprite):
                 self.curr_tile_x += self.curr_move[1]
                 self.curr_tile_y += self.curr_move[0]
                 self.curr_move = None
+
+
+class PacMan(Character):
+    def __init__(self, tile_x, tile_y):
+        # Call the parent's constructor
+        super(PacMan, self).__init__(tile_x, tile_y)
+        # load image
+        self.pacman_image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
+        self.image = self.pacman_image
+        self.rect = self.image.get_rect()
+        self.rect.left = tile_x * TILE_SIZE
+        self.rect.top = tile_y * TILE_SIZE
+        # movement
+        self.move_frames = 20  # how many frames it takes to move one cell
+
+    def update(self, level, coins):
+        self.move()
+        if self.curr_move:  # rotate sprite towards movement
+            self.rotate_towards_direction(self.curr_move)
         # movement finished: search for new targets
         if not self.curr_move and not self.planned_moves and coins:
             for coin in coins:
                 # if pacman is on top of the coin, consume it immediately
                 if self.curr_tile_x == coin.tile_x and self.curr_tile_y == coin.tile_y:
                     coin.kill()  # devour the coin
-                    level.score += 10 # claim some points
+                    level.score += 10  # claim some points
                 else:  # try to reach the coin
                     self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
                                                                   coin.tile_x, coin.tile_y)
@@ -213,6 +265,22 @@ class PacMan(pygame.sprite.Sprite):
         angles = {(0, 1): 0, (0, -1): 180, (-1, 0): 90, (1, 0): 270}
         self.image = pygame.transform.rotate(self.pacman_image, angles[direction])
 
+
+class Ghost(Character):
+    def __init__(self, tile_x, tile_y, move_frames):
+        # Call the parent's constructor
+        super(Ghost, self).__init__(tile_x, tile_y)
+        # load image
+        self.spooky_image = pygame.image.load("Assets/Images/spooky.png").convert_alpha()
+        self.image = self.spooky_image
+        self.rect = self.image.get_rect()
+        self.rect.left = tile_x * TILE_SIZE
+        self.rect.top = tile_y * TILE_SIZE
+        # movement
+        self.move_frames = move_frames  # how many frames it takes to move one cell
+
+    def update(self, level):
+        pass
 
 class Coin(pygame.sprite.Sprite):
     def __init__(self, tile_x, tile_y):
