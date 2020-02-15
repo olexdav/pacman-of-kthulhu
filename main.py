@@ -3,8 +3,8 @@ import pygame
 import pygame.freetype
 import Source.game as game
 
-LEVEL_WIDTH = 21
-LEVEL_HEIGHT = 13
+LEVEL_WIDTH = 19
+LEVEL_HEIGHT = 11
 # GAME_MODE = "Pathfinding"
 GAME_MODE = "Game"
 
@@ -38,7 +38,7 @@ def main():
     if GAME_MODE == "Pathfinding":
         level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=0, ghosts_n_coins=False)
     elif GAME_MODE == "Game":
-        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=5, ghosts_n_coins=True)
+        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=0, ghosts_n_coins=True)
     # get tile sprites
     tile_list = level.set_up_tile_sprites()
     # create pacman

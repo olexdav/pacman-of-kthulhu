@@ -5,6 +5,20 @@ from random import randint
 import pygame
 
 TILE_SIZE = 60
+PACMAN_MOVE_FRAMES = 20
+PACMAN_AI_DEPTH = 6
+
+
+# parameters that dictate how hard the game becomes at each difficulty level
+difficulty_settings = {
+    0: {"ghost_frames_per_tile": 25, "ghost_amount": 0},
+    1: {"ghost_frames_per_tile": 25, "ghost_amount": 2},
+    2: {"ghost_frames_per_tile": 22, "ghost_amount": 2},
+    3: {"ghost_frames_per_tile": 25, "ghost_amount": 3},
+    4: {"ghost_frames_per_tile": 23, "ghost_amount": 3},
+    5: {"ghost_frames_per_tile": 21, "ghost_amount": 3},
+    6: {"ghost_frames_per_tile": 19, "ghost_amount": 3},
+}
 
 
 class Tile(pygame.sprite.Sprite):
@@ -22,18 +36,6 @@ class Tile(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.top = TILE_SIZE * grid_y
         self.rect.left = TILE_SIZE * grid_x
-
-
-# parameters that dictate how hard the game becomes at each difficulty level
-difficulty_settings = {
-    0: {"ghost_frames_per_tile": 25, "ghost_amount": 1},
-    1: {"ghost_frames_per_tile": 25, "ghost_amount": 2},
-    2: {"ghost_frames_per_tile": 22, "ghost_amount": 2},
-    3: {"ghost_frames_per_tile": 25, "ghost_amount": 3},
-    4: {"ghost_frames_per_tile": 23, "ghost_amount": 3},
-    5: {"ghost_frames_per_tile": 21, "ghost_amount": 3},
-    6: {"ghost_frames_per_tile": 19, "ghost_amount": 3},
-}
 
 
 class Level:
@@ -84,7 +86,7 @@ class Level:
                 tile_map[location_y + y, location_x + x] = 0
 
     # add walls to the maze, making sure that there is always a path between 2 points
-    def add_random_walls(self, chance=0.5):
+    def add_random_walls(self, chance=0.3):
         # create list of points
         points = []
         for x in range(2, self.width - 1, 2):
@@ -273,7 +275,7 @@ class PacMan(Character):
         self.rect.left = tile_x * TILE_SIZE
         self.rect.top = tile_y * TILE_SIZE
         # movement
-        self.move_frames = 20  # how many frames it takes to move one cell
+        self.move_frames = PACMAN_MOVE_FRAMES  # how many frames it takes to move one cell
         # being eaten by ghosts
         self.dead = False
 
@@ -290,10 +292,11 @@ class PacMan(Character):
                 if self.curr_tile_x == coin.tile_x and self.curr_tile_y == coin.tile_y:
                     coin.kill()  # devour the coin
                     level.score += 10  # claim some points
-                else:  # try to reach the coin
-                    self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
-                                                                  coin.tile_x, coin.tile_y)
-                    break  # only try to eat the first coin on the list (for now)
+            self.planned_moves = [self.choose_best_move(level)]
+            #    else:  # try to reach the coin
+            #        #self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
+            #        #                                              coin.tile_x, coin.tile_y)
+            #        break  # only try to eat the first coin on the list (for now)
 
     def rotate_towards_direction(self, direction):
         angles = {(0, 1): 0, (0, -1): 180, (-1, 0): 90, (1, 0): 270}
@@ -302,6 +305,132 @@ class PacMan(Character):
     def die(self):
         self.dead = True
         self.image = self.dead_image
+
+    def choose_best_move(self, level):
+        # fetch current game state
+        curr_state = self.fetch_game_state(level)
+        # find a strategy that lets pacman eat the most coins
+        return curr_state.pick_best_move(level)
+
+    def fetch_game_state(self, level):
+        # save pacman location
+        game_state = GameState(None, self.curr_tile_x, self.curr_tile_y)
+        # save ghost locations
+        game_state.ghosts = []
+        for g in level.ghosts:
+            ghost = GhostPosition()
+            ghost.get_from_ghost(g)
+            game_state.ghosts.append(ghost)
+        return game_state
+
+
+class GhostPosition:
+    def __init__(self):
+        self.tile_x = 0
+        self.tile_y = 0
+        self.move_dir = None
+        self.move_progress = 0
+        self.move_frames = 0  # how many frames it takes to move one cell
+
+    def get_from_ghost(self, ghost):
+        self.tile_x = ghost.curr_tile_x
+        self.tile_y = ghost.curr_tile_y
+        self.move_dir = ghost.curr_move
+        self.move_progress = ghost.move_frame
+        self.move_frames = ghost.move_frames
+
+    def copy_from_other(self, other):
+        self.tile_x = other.tile_x
+        self.tile_y = other.tile_y
+        self.move_dir = other.move_dir
+        self.move_progress = other.move_progress
+        self.move_frames = other.move_frames
+
+
+class GameState:
+    def __init__(self, parent, pacman_x, pacman_y, depth=0, ghosts=None, picked_coins=[], move_here=None):
+        self.parent = parent
+        self.children = []
+        self.pacman_x, self.pacman_y = pacman_x, pacman_y
+        self.ghosts = ghosts  # list of ghost positions
+        self.depth = depth
+        self.picked_coins = picked_coins  # coordinates of coins picked up by pacman on the way
+        self.move_here = move_here  # a last move that lead pacman into this state
+
+    def evaluate_children(self, level):
+        if self.depth >= PACMAN_AI_DEPTH:  # stop evaluating children after a certain depth
+            return
+        # simulate ghost movement
+        new_ghosts = self.simulate_ghosts_movement(level)
+        # find valid moves
+        directions = [(0, 1), (0, -1), (-1, 0), (1, 0)]
+        for direction in directions:
+            target_y = self.pacman_y + direction[0]
+            target_x = self.pacman_x + direction[1]
+            if level.tile_map[target_y, target_x] == 0:  # move only through corridors
+                new_state = GameState(self, target_x, target_y, self.depth+1,
+                                      new_ghosts, self.picked_coins.copy(), direction)
+                if not new_state.is_deadly():
+                    new_state.pick_coin(level)
+                    new_state.evaluate_children(level)  # evaluate a new state recursively
+                    self.children.append(new_state)
+
+    def pick_best_move(self, level):
+        self.evaluate_children(level)
+        richest_leaf = self.get_richest_leaf()
+        return self.get_first_move_towards(richest_leaf)
+
+    # find leaf strategy that gives the most money
+    def get_richest_leaf(self):
+        if not self.children:
+            return self
+        richest_leaves = [child.get_richest_leaf() for child in self.children]
+        # TODO: choose random max value
+        coins_amount = [len(leaf.picked_coins) for leaf in richest_leaves]
+        richest_leaf = richest_leaves[np.argmax(np.array(coins_amount))]
+        return richest_leaf
+
+    # find first move that pacman has to take to reach from "self" to "state"
+    def get_first_move_towards(self, state):
+        curr_node = state
+        while curr_node.parent != self:
+            curr_node = curr_node.parent
+        return curr_node.move_here
+
+    def is_deadly(self):
+        return False  # TODO: check for pacman and ghost collisions
+
+    # pick a coin if it is located in the same tile as pacman
+    def pick_coin(self, level):
+        pac_pos = self.pacman_y, self.pacman_x
+        if pac_pos in self.picked_coins:  # check if the coin is already picked
+            return
+        for coin in level.coins:  # check if pacman is currently standing on a coin
+            if coin.tile_x == self.pacman_x and coin.tile_y == self.pacman_y:
+                self.picked_coins.append((coin.tile_y, coin.tile_x))  # pick up a coin
+
+    # simulate movement for a list of ghost positions and return a new list
+    def simulate_ghosts_movement(self, level):
+        return [self.simulate_ghost_movement(g, level) for g in self.ghosts]
+
+    def simulate_ghost_movement(self, old_ghost, level):
+        ghost = GhostPosition()  # create a copy of the ghost
+        ghost.copy_from_other(old_ghost)
+        if not ghost.move_dir:  # pick a good move
+            ghost.move_dir = self.pick_good_ghost_move(ghost, level)
+        ghost.move_progress += PACMAN_MOVE_FRAMES
+        while ghost.move_progress >= ghost.move_frames:  # move as time passes
+            ghost.tile_y += ghost.move_dir[0]
+            ghost.tile_x += ghost.move_dir[1]
+            if not ghost.move_dir:  # pick a good move
+                ghost.move_dir = self.pick_good_ghost_move(ghost, level)
+            ghost.move_progress -= ghost.move_frames
+        return ghost
+
+    def pick_good_ghost_move(self, ghost, level):
+        path_moves = level.find_shortest_path(ghost.tile_x, ghost.tile_y,
+                                              self.pacman_x, self.pacman_y)
+        return path_moves[0]
 
 
 class Ghost(Character):
@@ -339,6 +468,7 @@ class Ghost(Character):
     def flip_towards_direction(self, direction):
         if direction == (0, 1) or direction == (0, -1):  # update image when moving sideways
             self.image = pygame.transform.flip(self.spooky_image, direction == (0, 1), 0)
+
 
 class Coin(pygame.sprite.Sprite):
     def __init__(self, tile_x, tile_y):
