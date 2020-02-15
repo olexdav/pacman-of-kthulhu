@@ -239,6 +239,7 @@ class Character(pygame.sprite.Sprite):
         self.move_frame = 0
         self.curr_move = None  # current direction of movement
         self.planned_moves = []
+        self.sprite_offset_x = 0  # move a sprite a bit to the right to center it
 
     # updates movement for 1 frame, following and executing planned_moves
     def move(self):
@@ -252,6 +253,7 @@ class Character(pygame.sprite.Sprite):
             self.move_frame += 1
             movement_percent = self.move_frame / self.move_frames
             self.rect.left = int((self.curr_tile_x + self.curr_move[1] * movement_percent) * TILE_SIZE)
+            self.rect.left = self.rect.left + self.sprite_offset_x
             self.rect.top = int((self.curr_tile_y + self.curr_move[0] * movement_percent) * TILE_SIZE)
             if self.move_frame >= self.move_frames:  # finish move
                 self.curr_tile_x += self.curr_move[1]
@@ -265,14 +267,19 @@ class PacMan(Character):
         super(PacMan, self).__init__(tile_x, tile_y)
         # load image
         self.pacman_image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
+        self.dead_image = pygame.image.load("Assets/Images/pacman_dead.png").convert_alpha()
         self.image = self.pacman_image
         self.rect = self.image.get_rect()
         self.rect.left = tile_x * TILE_SIZE
         self.rect.top = tile_y * TILE_SIZE
         # movement
         self.move_frames = 20  # how many frames it takes to move one cell
+        # being eaten by ghosts
+        self.dead = False
 
     def update(self, level):
+        if self.dead:  # dead men tell no tales
+            return
         self.move()
         if self.curr_move:  # rotate sprite towards movement
             self.rotate_towards_direction(self.curr_move)
@@ -292,6 +299,10 @@ class PacMan(Character):
         angles = {(0, 1): 0, (0, -1): 180, (-1, 0): 90, (1, 0): 270}
         self.image = pygame.transform.rotate(self.pacman_image, angles[direction])
 
+    def die(self):
+        self.dead = True
+        self.image = self.dead_image
+
 
 class Ghost(Character):
     def __init__(self, tile_x, tile_y, move_frames):
@@ -303,11 +314,31 @@ class Ghost(Character):
         self.rect = self.image.get_rect()
         self.rect.left = tile_x * TILE_SIZE
         self.rect.top = tile_y * TILE_SIZE
+        self.sprite_offset_x = 5
         # movement
         self.move_frames = move_frames  # how many frames it takes to move one cell
 
-    def update(self, level):
-        pass
+    def update(self, level, pacman):
+        self.move()
+        if self.curr_move:  # flip sprite towards movement
+            self.flip_towards_direction(self.curr_move)
+        # check for collision with pacman
+        px, py = pacman.rect.centerx, pacman.rect.centery
+        gx, gy = self.rect.centerx, self.rect.centery
+        pacman_dist = ((px-gx)**2 + (py-gy)**2) ** 0.5
+        if pacman_dist < TILE_SIZE * 0.9:  # pacman in range
+            pacman.die()  # murder pacman
+        # movement finished: search for a path towards pacman
+        if not self.curr_move and not self.planned_moves:
+            pacman_x, pacman_y = pacman.curr_tile_x, pacman.curr_tile_y
+            moves_to_pacman = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
+                                                       pacman_x, pacman_y)
+            self.planned_moves = moves_to_pacman[:1]  # take only the first move
+
+    # make the ghost face the direction of movement
+    def flip_towards_direction(self, direction):
+        if direction == (0, 1) or direction == (0, -1):  # update image when moving sideways
+            self.image = pygame.transform.flip(self.spooky_image, direction == (0, 1), 0)
 
 class Coin(pygame.sprite.Sprite):
     def __init__(self, tile_x, tile_y):

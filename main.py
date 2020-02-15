@@ -70,6 +70,7 @@ def main():
 
         # update game logic
         pacman.update(level)
+        level.ghosts.update(level, pacman)
         level.update()
 
         # draw everything
