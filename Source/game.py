@@ -1,12 +1,11 @@
 import os
 import numpy as np
-from random import shuffle
-from random import randint
+import random
 import pygame
 
 TILE_SIZE = 60
 PACMAN_MOVE_FRAMES = 20
-PACMAN_AI_DEPTH = 6
+PACMAN_AI_DEPTH = 8
 
 
 # parameters that dictate how hard the game becomes at each difficulty level
@@ -95,7 +94,7 @@ class Level:
         for x in range(1, self.width - 1, 2):
             for y in range(2, self.height - 1, 2):
                 points.append((y, x))
-        shuffle(points)
+        random.shuffle(points)
         for y, x in points:
             # add wall if it doesn't obstruct movement
             if self.can_place_wall(y, x):
@@ -206,9 +205,9 @@ class Level:
         for qy, qx in quadrant_topleft_points:
             point = 0, 0
             while self.tile_map[point[0], point[1]] != 0:  # find a random empty tile in quadrant
-                point = qy + randint(0, quadrant_h-1), qx + randint(0, quadrant_w-1)
+                point = qy + random.randint(0, quadrant_h-1), qx + random.randint(0, quadrant_w-1)
             points.append(point)
-        shuffle(points)
+        random.shuffle(points)
         return points[:points_amount]
 
     # places coins all over the map, except for the spawn point
@@ -232,6 +231,7 @@ class Level:
             if not intersect:
                 self.coins.add(Coin(tile_x, tile_y))
 
+
 class Character(pygame.sprite.Sprite):
     def __init__(self, tile_x, tile_y):
         # Call the parent's constructor
@@ -242,6 +242,8 @@ class Character(pygame.sprite.Sprite):
         self.curr_move = None  # current direction of movement
         self.planned_moves = []
         self.sprite_offset_x = 0  # move a sprite a bit to the right to center it
+        self.move_frames = None
+        self.rect = None
 
     # updates movement for 1 frame, following and executing planned_moves
     def move(self):
@@ -292,7 +294,8 @@ class PacMan(Character):
                 if self.curr_tile_x == coin.tile_x and self.curr_tile_y == coin.tile_y:
                     coin.kill()  # devour the coin
                     level.score += 10  # claim some points
-            self.planned_moves = [self.choose_best_move(level)]
+            if level.coins:
+                self.planned_moves = [self.choose_best_move(level)]
             #    else:  # try to reach the coin
             #        #self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
             #        #                                              coin.tile_x, coin.tile_y)
@@ -355,7 +358,12 @@ class GameState:
         self.ghosts = ghosts  # list of ghost positions
         self.depth = depth
         self.picked_coins = picked_coins  # coordinates of coins picked up by pacman on the way
+        self.picked_coin_now = False  # whether pacman just picked a coin by his (last) move here
         self.move_here = move_here  # a last move that lead pacman into this state
+
+    @staticmethod
+    def is_direction_opposite(dir1, dir2):
+        return dir1[0] == -dir2[0] and dir1[1] == -dir2[1]
 
     def evaluate_children(self, level):
         if self.depth >= PACMAN_AI_DEPTH:  # stop evaluating children after a certain depth
@@ -365,6 +373,10 @@ class GameState:
         # find valid moves
         directions = [(0, 1), (0, -1), (-1, 0), (1, 0)]
         for direction in directions:
+            # don't allow backtracking
+            if self.move_here:
+                if not self.picked_coin_now and GameState.is_direction_opposite(direction, self.move_here):
+                    continue
             target_y = self.pacman_y + direction[0]
             target_x = self.pacman_x + direction[1]
             if level.tile_map[target_y, target_x] == 0:  # move only through corridors
@@ -377,15 +389,37 @@ class GameState:
 
     def pick_best_move(self, level):
         self.evaluate_children(level)
-        richest_leaf = self.get_richest_leaf()
-        return self.get_first_move_towards(richest_leaf)
+        #richest_leaf = self.get_richest_leaf()
+        #if self.pacman_y == 5 and (4 <= self.pacman_x <= 5):
+        #    useless_var = 12
+        #return self.get_first_move_towards(richest_leaf)
+        # search for the closest coin
+        closest_coin_state = self.get_closest_coin_state()
+        return self.get_first_move_towards(closest_coin_state)
+
+    # find game state that yields a coin in a smallest amount of moves
+    def get_closest_coin_state(self):
+        queue = [self]
+        leaves = []
+        while queue:  # breadth-first search
+            curr_state = queue.pop(0)
+            if curr_state.picked_coins:
+                # TODO: check if this state ensures survival after picking up the coin
+                return curr_state  # closest state found!
+            if curr_state.children:
+                for child in curr_state.children:
+                    queue.append(child)
+            elif curr_state.depth == PACMAN_AI_DEPTH:
+                leaves.append(curr_state)
+        # if no path within the field of vision yields a coin, move randomly
+        return random.choice(leaves)
 
     # find leaf strategy that gives the most money
     def get_richest_leaf(self):
         if not self.children:
             return self
         richest_leaves = [child.get_richest_leaf() for child in self.children]
-        # TODO: choose random max value
+        # TODO: choose closest max value
         coins_amount = [len(leaf.picked_coins) for leaf in richest_leaves]
         richest_leaf = richest_leaves[np.argmax(np.array(coins_amount))]
         return richest_leaf
@@ -408,6 +442,7 @@ class GameState:
         for coin in level.coins:  # check if pacman is currently standing on a coin
             if coin.tile_x == self.pacman_x and coin.tile_y == self.pacman_y:
                 self.picked_coins.append((coin.tile_y, coin.tile_x))  # pick up a coin
+                self.picked_coin_now = True
 
     # simulate movement for a list of ghost positions and return a new list
     def simulate_ghosts_movement(self, level):
@@ -481,7 +516,7 @@ class Coin(pygame.sprite.Sprite):
             image = pygame.image.load(path + os.sep + file_name).convert_alpha()
             self.images.append(image)
         # set up animation
-        self.index = randint(0, len(self.images)-1)  # random animation index
+        self.index = random.randint(0, len(self.images)-1)  # random animation index
         self.image = self.images[self.index]
         self.animation_frames = 6  # how many frames each image in the animation will last
         self.current_frame = 0
