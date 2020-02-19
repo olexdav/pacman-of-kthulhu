@@ -5,12 +5,12 @@ import pygame
 
 TILE_SIZE = 60
 PACMAN_MOVE_FRAMES = 20
-PACMAN_AI_DEPTH = 8
+PACMAN_AI_DEPTH = 7
 
 
 # parameters that dictate how hard the game becomes at each difficulty level
 difficulty_settings = {
-    0: {"ghost_frames_per_tile": 25, "ghost_amount": 0},
+    0: {"ghost_frames_per_tile": 30, "ghost_amount": 1},
     1: {"ghost_frames_per_tile": 25, "ghost_amount": 2},
     2: {"ghost_frames_per_tile": 22, "ghost_amount": 2},
     3: {"ghost_frames_per_tile": 25, "ghost_amount": 3},
@@ -85,7 +85,7 @@ class Level:
                 tile_map[location_y + y, location_x + x] = 0
 
     # add walls to the maze, making sure that there is always a path between 2 points
-    def add_random_walls(self, chance=0.3):
+    def add_random_walls(self, chance=0.25):
         # create list of points
         points = []
         for x in range(2, self.width - 1, 2):
@@ -387,6 +387,16 @@ class GameState:
                     new_state.evaluate_children(level)  # evaluate a new state recursively
                     self.children.append(new_state)
 
+    def pick_random_move(self, level):
+        directions = [(0, 1), (0, -1), (-1, 0), (1, 0)]
+        possible_moves = []
+        for direction in directions:
+            target_y = self.pacman_y + direction[0]
+            target_x = self.pacman_x + direction[1]
+            if level.tile_map[target_y, target_x] == 0:  # move only through corridors
+                possible_moves.append(direction)
+        return random.choice(possible_moves)
+
     def pick_best_move(self, level):
         self.evaluate_children(level)
         #richest_leaf = self.get_richest_leaf()
@@ -395,9 +405,13 @@ class GameState:
         #return self.get_first_move_towards(richest_leaf)
         # search for the closest coin
         closest_coin_state = self.get_closest_coin_state()
-        return self.get_first_move_towards(closest_coin_state)
+        if closest_coin_state:
+            return self.get_first_move_towards(closest_coin_state)
+        else:  # the situation is hopeless at this point, just panic
+            return self.pick_random_move(level)
 
     # find game state that yields a coin in a smallest amount of moves
+    # if no such state exists, move randomly
     def get_closest_coin_state(self):
         queue = [self]
         leaves = []
@@ -412,7 +426,8 @@ class GameState:
             elif curr_state.depth == PACMAN_AI_DEPTH:
                 leaves.append(curr_state)
         # if no path within the field of vision yields a coin, move randomly
-        return random.choice(leaves)
+        if leaves:
+            return random.choice(leaves)
 
     # find leaf strategy that gives the most money
     def get_richest_leaf(self):
@@ -431,8 +446,20 @@ class GameState:
             curr_node = curr_node.parent
         return curr_node.move_here
 
+    # check if pacman gets eaten in this state
     def is_deadly(self):
-        return False  # TODO: check for pacman and ghost collisions
+        for ghost in self.ghosts:  # check for pacman and ghost collisions
+            if self.check_collision(ghost):
+                return True
+        return False
+
+    # check if a ghost is in range of pacman
+    def check_collision(self, ghost, clear_range=1.2):
+        ghost_y = ghost.tile_y + ghost.move_dir[0] * ghost.move_progress / ghost.move_frames
+        ghost_x = ghost.tile_x + ghost.move_dir[1] * ghost.move_progress / ghost.move_frames
+        px, py = self.pacman_x, self.pacman_y
+        # try to maintain at least clear_range tiles from a ghost
+        return ((ghost_y-py)**2 + (ghost_x-px)**2)**0.5 < clear_range
 
     # pick a coin if it is located in the same tile as pacman
     def pick_coin(self, level):
