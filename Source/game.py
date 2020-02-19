@@ -5,7 +5,7 @@ import pygame
 
 TILE_SIZE = 60
 PACMAN_MOVE_FRAMES = 20
-PACMAN_AI_DEPTH = 7
+PACMAN_AI_DEPTH = 8
 
 
 # parameters that dictate how hard the game becomes at each difficulty level
@@ -85,7 +85,7 @@ class Level:
                 tile_map[location_y + y, location_x + x] = 0
 
     # add walls to the maze, making sure that there is always a path between 2 points
-    def add_random_walls(self, chance=0.25):
+    def add_random_walls(self, chance=0.2):
         # create list of points
         points = []
         for x in range(2, self.width - 1, 2):
@@ -271,6 +271,8 @@ class PacMan(Character):
         super(PacMan, self).__init__(tile_x, tile_y)
         # load image
         self.pacman_image = pygame.image.load("Assets/Images/pacman.png").convert_alpha()
+        self.scared_image = pygame.image.load("Assets/Images/pacman_scared.png").convert_alpha()
+        self.current_image = self.pacman_image
         self.dead_image = pygame.image.load("Assets/Images/pacman_dead.png").convert_alpha()
         self.image = self.pacman_image
         self.rect = self.image.get_rect()
@@ -303,7 +305,7 @@ class PacMan(Character):
 
     def rotate_towards_direction(self, direction):
         angles = {(0, 1): 0, (0, -1): 180, (-1, 0): 90, (1, 0): 270}
-        self.image = pygame.transform.rotate(self.pacman_image, angles[direction])
+        self.image = pygame.transform.rotate(self.current_image, angles[direction])
 
     def die(self):
         self.dead = True
@@ -313,7 +315,7 @@ class PacMan(Character):
         # fetch current game state
         curr_state = self.fetch_game_state(level)
         # find a strategy that lets pacman eat the most coins
-        return curr_state.pick_best_move(level)
+        return curr_state.pick_best_move(level, self)
 
     def fetch_game_state(self, level):
         # save pacman location
@@ -397,7 +399,7 @@ class GameState:
                 possible_moves.append(direction)
         return random.choice(possible_moves)
 
-    def pick_best_move(self, level):
+    def pick_best_move(self, level, pacman):
         self.evaluate_children(level)
         #richest_leaf = self.get_richest_leaf()
         #if self.pacman_y == 5 and (4 <= self.pacman_x <= 5):
@@ -406,8 +408,10 @@ class GameState:
         # search for the closest coin
         closest_coin_state = self.get_closest_coin_state()
         if closest_coin_state:
+            pacman.current_image = pacman.pacman_image
             return self.get_first_move_towards(closest_coin_state)
         else:  # the situation is hopeless at this point, just panic
+            pacman.current_image = pacman.scared_image  # be frightened
             return self.pick_random_move(level)
 
     # find game state that yields a coin in a smallest amount of moves
