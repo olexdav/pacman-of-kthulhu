@@ -423,7 +423,9 @@ class GameState:
             curr_state = queue.pop(0)
             if curr_state.picked_coins:
                 # TODO: check if this state ensures survival after picking up the coin
-                return curr_state  # closest state found!
+                # check if the state has at least one descendant at max depth that is not deadly
+                if curr_state.has_surviving_leaves():
+                    return curr_state  # closest state found!
             if curr_state.children:
                 for child in curr_state.children:
                     queue.append(child)
@@ -432,6 +434,18 @@ class GameState:
         # if no path within the field of vision yields a coin, move randomly
         if leaves:
             return random.choice(leaves)
+
+    # check whether a state has at least one descendant at max depth that is not deadly
+    def has_surviving_leaves(self):
+        stack = [self]  # depth-first search
+        while stack:
+            curr_state = stack.pop()
+            if curr_state.depth == PACMAN_AI_DEPTH-1:
+                return True
+            if curr_state.children:
+                for child in curr_state.children:
+                    stack.append(child)
+        return False  # no survival strategy found
 
     # find leaf strategy that gives the most money
     def get_richest_leaf(self):
@@ -458,7 +472,7 @@ class GameState:
         return False
 
     # check if a ghost is in range of pacman
-    def check_collision(self, ghost, clear_range=1.2):
+    def check_collision(self, ghost, clear_range=1.4):
         ghost_y = ghost.tile_y + ghost.move_dir[0] * ghost.move_progress / ghost.move_frames
         ghost_x = ghost.tile_x + ghost.move_dir[1] * ghost.move_progress / ghost.move_frames
         px, py = self.pacman_x, self.pacman_y
