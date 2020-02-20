@@ -10,8 +10,8 @@ PACMAN_AI_DEPTH = 8
 
 # parameters that dictate how hard the game becomes at each difficulty level
 difficulty_settings = {
-    0: {"ghost_frames_per_tile": 30, "ghost_amount": 1},
-    1: {"ghost_frames_per_tile": 25, "ghost_amount": 2},
+    0: {"ghost_frames_per_tile": 30, "ghost_amount": 0},
+    1: {"ghost_frames_per_tile": 25, "ghost_amount": 1},
     2: {"ghost_frames_per_tile": 22, "ghost_amount": 2},
     3: {"ghost_frames_per_tile": 25, "ghost_amount": 3},
     4: {"ghost_frames_per_tile": 23, "ghost_amount": 3},
@@ -472,7 +472,7 @@ class GameState:
         return False
 
     # check if a ghost is in range of pacman
-    def check_collision(self, ghost, clear_range=1.4):
+    def check_collision(self, ghost, clear_range=1.5):
         ghost_y = ghost.tile_y + ghost.move_dir[0] * ghost.move_progress / ghost.move_frames
         ghost_x = ghost.tile_x + ghost.move_dir[1] * ghost.move_progress / ghost.move_frames
         px, py = self.pacman_x, self.pacman_y

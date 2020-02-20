@@ -1,10 +1,11 @@
 import os
 import pygame
 import pygame.freetype
+import sympy
 import Source.game as game
 
-LEVEL_WIDTH = 19
-LEVEL_HEIGHT = 11
+LEVEL_WIDTH = 9
+LEVEL_HEIGHT = 9
 # GAME_MODE = "Pathfinding"
 GAME_MODE = "Game"
 
@@ -16,6 +17,31 @@ def draw_score(screen, score):
     text_rect.top = 14
     text_rect.left = 14
     screen.blit(text, text_rect)
+
+
+def draw_floating_label(screen, animation_progress, text, color, font_size):
+    height, width = pygame.display.get_surface().get_size()
+    font = pygame.freetype.Font("Assets/Fonts/PokemonGb.ttf", font_size)
+    text, text_rect = font.render(text, color)
+    y = -int(sympy.cot(0.001+animation_progress*3.15)*40) + height // 2
+    text_rect.center = width // 2, y
+    screen.blit(text, text_rect)
+
+
+def create_level(difficulty):
+    level = None
+    if GAME_MODE == "Pathfinding":
+        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=0, ghosts_n_coins=False)
+    elif GAME_MODE == "Game":
+        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=difficulty, ghosts_n_coins=True)
+    # get tile sprites
+    tile_list = level.set_up_tile_sprites()
+    # create pacman
+    pacman = game.PacMan(LEVEL_WIDTH // 2, LEVEL_HEIGHT // 2)
+    pacman_list = pygame.sprite.RenderPlain()
+    pacman_list.add(pacman)
+    return level, pacman, pacman_list, tile_list
+
 
 # define a main function
 def main():
@@ -33,18 +59,15 @@ def main():
     screen = pygame.display.set_mode((LEVEL_WIDTH*game.TILE_SIZE,
                                       LEVEL_HEIGHT*game.TILE_SIZE))
 
+    game_state = "running"
+    current_difficulty = 0
+
+    # "victory" and "defeat" labels
+    floating_text_animation_frame = 0
+    floating_text_animation_frames = 120
+
     # create level
-    level = None
-    if GAME_MODE == "Pathfinding":
-        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=0, ghosts_n_coins=False)
-    elif GAME_MODE == "Game":
-        level = game.Level(LEVEL_WIDTH, LEVEL_HEIGHT, difficulty=0, ghosts_n_coins=True)
-    # get tile sprites
-    tile_list = level.set_up_tile_sprites()
-    # create pacman
-    pacman = game.PacMan(LEVEL_WIDTH // 2, LEVEL_HEIGHT // 2)
-    pacman_list = pygame.sprite.RenderPlain()
-    pacman_list.add(pacman)
+    level, pacman, pacman_list, tile_list = create_level(current_difficulty)
 
     # game clock
     clock = pygame.time.Clock()
@@ -69,9 +92,36 @@ def main():
                 # clicked_tiles = [s for s in tile_list if s.rect.collidepoint(mouse_pos)]
 
         # update game logic
-        pacman.update(level)
-        level.ghosts.update(level, pacman)
-        level.update()
+        if game_state == "running":
+            pacman.update(level)
+            level.ghosts.update(level, pacman)
+            level.update()
+            if not level.coins:  # win the game once all of the coins have been eaten
+                game_state = "victory"
+                current_difficulty += 1  # bump up the difficulty
+            elif pacman.dead:
+                game_state = "defeat"
+                current_difficulty = 0  # reset difficulty
+        elif game_state == "victory":
+            pass
+            # update victorious animation
+            floating_text_animation_frame += 1
+            # create next level
+            if floating_text_animation_frame >= floating_text_animation_frames:
+                floating_text_animation_frame = 0
+                curr_score = level.score  # maintain score
+                level, pacman, pacman_list, tile_list = create_level(current_difficulty)
+                level.score = curr_score
+                game_state = "running"
+        elif game_state == "defeat":
+            pass
+            # update defeat animation
+            floating_text_animation_frame += 1
+            # create next level
+            if floating_text_animation_frame >= floating_text_animation_frames:
+                floating_text_animation_frame = 0
+                level, pacman, pacman_list, tile_list = create_level(current_difficulty)
+                game_state = "running"
 
         # draw everything
         tile_list.draw(screen)
@@ -79,6 +129,12 @@ def main():
         pacman_list.draw(screen)
         level.ghosts.draw(screen)
         draw_score(screen, level.score)
+        animation_progress = floating_text_animation_frame / floating_text_animation_frames
+        if game_state == "victory":
+            label_text = f"Onwards to level {current_difficulty}!"
+            draw_floating_label(screen, animation_progress, label_text, (255, 248, 99), 24)
+        elif game_state == "defeat":
+            draw_floating_label(screen, animation_progress, "DEAD", (209, 0, 28), 64)
         pygame.display.flip()
         clock.tick(60)
 
