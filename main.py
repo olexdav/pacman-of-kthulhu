@@ -60,7 +60,7 @@ def main():
                                       LEVEL_HEIGHT*game.TILE_SIZE))
 
     game_state = "running"
-    current_difficulty = 1
+    current_difficulty = 0
 
     # "victory" and "defeat" labels
     floating_text_animation_frame = 0

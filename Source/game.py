@@ -5,18 +5,19 @@ import pygame
 
 TILE_SIZE = 60
 PACMAN_MOVE_FRAMES = 20
-PACMAN_AI_DEPTH = 10
+PACMAN_AI_DEPTH = 8
 
 
 # parameters that dictate how hard the game becomes at each difficulty level
 difficulty_settings = {
-    0: {"ghost_frames_per_tile": 99, "ghost_amount": 0},
-    1: {"ghost_frames_per_tile": 40, "ghost_amount": 1},
-    2: {"ghost_frames_per_tile": 30, "ghost_amount": 1},
-    3: {"ghost_frames_per_tile": 20, "ghost_amount": 1},
-    4: {"ghost_frames_per_tile": 40, "ghost_amount": 2},
-    5: {"ghost_frames_per_tile": 30, "ghost_amount": 2},
-    6: {"ghost_frames_per_tile": 40, "ghost_amount": 3},
+    0: {"ghost_frames_per_tile": 99, "ghost_amount": 0, "random_move_chance": 0.0},
+    1: {"ghost_frames_per_tile": 40, "ghost_amount": 1, "random_move_chance": 1.0},
+    2: {"ghost_frames_per_tile": 40, "ghost_amount": 1, "random_move_chance": 0.1},
+    3: {"ghost_frames_per_tile": 30, "ghost_amount": 1, "random_move_chance": 0.3},
+    4: {"ghost_frames_per_tile": 40, "ghost_amount": 2, "random_move_chance": 0.4},
+    5: {"ghost_frames_per_tile": 40, "ghost_amount": 2, "random_move_chance": 0.1},
+    6: {"ghost_frames_per_tile": 40, "ghost_amount": 3, "random_move_chance": 0.4},
+    7: {"ghost_frames_per_tile": 30, "ghost_amount": 4, "random_move_chance": 0.1}  # this is basically impossible
 }
 
 
@@ -189,10 +190,11 @@ class Level:
         params = difficulty_settings[self.difficulty]
         ghost_frames_per_tile = params["ghost_frames_per_tile"]
         ghost_amount = params["ghost_amount"]
+        random_move_chance = params["random_move_chance"]
         # pick random locations away from the center of the maze
         spawn_points = self.get_random_locations_in_corners(ghost_amount)
         for spawn_y, spawn_x in spawn_points:
-            ghost = Ghost(spawn_x, spawn_y, ghost_frames_per_tile)
+            ghost = Ghost(spawn_x, spawn_y, ghost_frames_per_tile, random_move_chance)
             self.ghosts.add(ghost)
 
     # get up to 4 random locations in different corners of the map
@@ -513,7 +515,7 @@ class GameState:
 
 
 class Ghost(Character):
-    def __init__(self, tile_x, tile_y, move_frames):
+    def __init__(self, tile_x, tile_y, move_frames, random_move_chance):
         # Call the parent's constructor
         super(Ghost, self).__init__(tile_x, tile_y)
         # load image
@@ -525,6 +527,7 @@ class Ghost(Character):
         self.sprite_offset_x = 5
         # movement
         self.move_frames = move_frames  # how many frames it takes to move one cell
+        self.random_move_chance = random_move_chance  # chance of moving randomly
 
     def update(self, level, pacman):
         self.move()
@@ -538,15 +541,32 @@ class Ghost(Character):
             pacman.die()  # murder pacman
         # movement finished: search for a path towards pacman
         if not self.curr_move and not self.planned_moves:
-            pacman_x, pacman_y = pacman.curr_tile_x, pacman.curr_tile_y
-            moves_to_pacman = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
-                                                       pacman_x, pacman_y)
-            self.planned_moves = moves_to_pacman[:1]  # take only the first move
+            picked_move = self.pick_move(level, pacman)
+            if picked_move:
+                self.planned_moves = [picked_move]  # take only the first move
 
     # make the ghost face the direction of movement
     def flip_towards_direction(self, direction):
         if direction == (0, 1) or direction == (0, -1):  # update image when moving sideways
             self.image = pygame.transform.flip(self.spooky_image, direction == (0, 1), 0)
+
+    def pick_move(self, level, pacman):
+        if np.random.random_sample() < self.random_move_chance:
+            # pick random move
+            directions = [(0, 1), (0, -1), (-1, 0), (1, 0)]
+            possible_moves = []
+            for direction in directions:
+                target_y = self.curr_tile_y + direction[0]
+                target_x = self.curr_tile_x + direction[1]
+                if level.tile_map[target_y, target_x] == 0:
+                    possible_moves.append(direction)
+            return random.choice(possible_moves)
+        else:  # pursue pacman
+            pacman_x, pacman_y = pacman.curr_tile_x, pacman.curr_tile_y
+            moves_to_pacman = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
+                                                       pacman_x, pacman_y)
+            if moves_to_pacman:
+                return moves_to_pacman[0]
 
 
 class Coin(pygame.sprite.Sprite):
