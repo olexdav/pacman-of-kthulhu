@@ -101,7 +101,7 @@ def main():
                 pacman.update(level)
                 level.ghosts.update(level, pacman)
                 level.update()
-                if not level.coins:  # win the game once all of the coins have been eaten
+                if not level.coins and GAME_MODE == "Game":  # win the game once all of the coins have been eaten
                     game_state = "victory"
                     current_difficulty += 1  # bump up the difficulty
                 elif pacman.dead:
