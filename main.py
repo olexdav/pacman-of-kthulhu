@@ -60,7 +60,7 @@ def main():
                                       LEVEL_HEIGHT*game.TILE_SIZE))
 
     game_state = "running"
-    current_difficulty = 0
+    current_difficulty = 1
 
     # "victory" and "defeat" labels
     floating_text_animation_frame = 0
@@ -74,6 +74,8 @@ def main():
 
     # define a variable to control the main loop
     running = True
+    # pause the game with space
+    pause = False
 
     # main loop
     while running:
@@ -90,38 +92,41 @@ def main():
                 if level.tile_map[tile_y, tile_x] == 0:  # only place coins in empty corridors
                     level.add_coin(tile_x, tile_y)
                 # clicked_tiles = [s for s in tile_list if s.rect.collidepoint(mouse_pos)]
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                pause = not pause
 
         # update game logic
-        if game_state == "running":
-            pacman.update(level)
-            level.ghosts.update(level, pacman)
-            level.update()
-            if not level.coins:  # win the game once all of the coins have been eaten
-                game_state = "victory"
-                current_difficulty += 1  # bump up the difficulty
-            elif pacman.dead:
-                game_state = "defeat"
-                current_difficulty = 0  # reset difficulty
-        elif game_state == "victory":
-            pass
-            # update victorious animation
-            floating_text_animation_frame += 1
-            # create next level
-            if floating_text_animation_frame >= floating_text_animation_frames:
-                floating_text_animation_frame = 0
-                curr_score = level.score  # maintain score
-                level, pacman, pacman_list, tile_list = create_level(current_difficulty)
-                level.score = curr_score
-                game_state = "running"
-        elif game_state == "defeat":
-            pass
-            # update defeat animation
-            floating_text_animation_frame += 1
-            # create next level
-            if floating_text_animation_frame >= floating_text_animation_frames:
-                floating_text_animation_frame = 0
-                level, pacman, pacman_list, tile_list = create_level(current_difficulty)
-                game_state = "running"
+        if not pause:
+            if game_state == "running":
+                pacman.update(level)
+                level.ghosts.update(level, pacman)
+                level.update()
+                if not level.coins:  # win the game once all of the coins have been eaten
+                    game_state = "victory"
+                    current_difficulty += 1  # bump up the difficulty
+                elif pacman.dead:
+                    game_state = "defeat"
+                    current_difficulty = 0  # reset difficulty
+            elif game_state == "victory":
+                pass
+                # update victorious animation
+                floating_text_animation_frame += 1
+                # create next level
+                if floating_text_animation_frame >= floating_text_animation_frames:
+                    floating_text_animation_frame = 0
+                    curr_score = level.score  # maintain score
+                    level, pacman, pacman_list, tile_list = create_level(current_difficulty)
+                    level.score = curr_score
+                    game_state = "running"
+            elif game_state == "defeat":
+                pass
+                # update defeat animation
+                floating_text_animation_frame += 1
+                # create next level
+                if floating_text_animation_frame >= floating_text_animation_frames:
+                    floating_text_animation_frame = 0
+                    level, pacman, pacman_list, tile_list = create_level(current_difficulty)
+                    game_state = "running"
 
         # draw everything
         tile_list.draw(screen)

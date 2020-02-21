@@ -5,18 +5,18 @@ import pygame
 
 TILE_SIZE = 60
 PACMAN_MOVE_FRAMES = 20
-PACMAN_AI_DEPTH = 8
+PACMAN_AI_DEPTH = 10
 
 
 # parameters that dictate how hard the game becomes at each difficulty level
 difficulty_settings = {
-    0: {"ghost_frames_per_tile": 30, "ghost_amount": 0},
-    1: {"ghost_frames_per_tile": 25, "ghost_amount": 1},
-    2: {"ghost_frames_per_tile": 22, "ghost_amount": 2},
-    3: {"ghost_frames_per_tile": 25, "ghost_amount": 3},
-    4: {"ghost_frames_per_tile": 23, "ghost_amount": 3},
-    5: {"ghost_frames_per_tile": 21, "ghost_amount": 3},
-    6: {"ghost_frames_per_tile": 19, "ghost_amount": 3},
+    0: {"ghost_frames_per_tile": 99, "ghost_amount": 0},
+    1: {"ghost_frames_per_tile": 40, "ghost_amount": 1},
+    2: {"ghost_frames_per_tile": 30, "ghost_amount": 1},
+    3: {"ghost_frames_per_tile": 20, "ghost_amount": 1},
+    4: {"ghost_frames_per_tile": 40, "ghost_amount": 2},
+    5: {"ghost_frames_per_tile": 30, "ghost_amount": 2},
+    6: {"ghost_frames_per_tile": 40, "ghost_amount": 3},
 }
 
 
@@ -60,7 +60,7 @@ class Level:
     def generate_tile_map(self):
         width, height = self.width, self.height
         tile_map = np.zeros((height, width), dtype=int)
-        # surround map with unpassable wall border
+        # surround map with impassable wall border
         for x in range(width):
             tile_map[0, x] = 1
             tile_map[-1, x] = 1
@@ -85,7 +85,7 @@ class Level:
                 tile_map[location_y + y, location_x + x] = 0
 
     # add walls to the maze, making sure that there is always a path between 2 points
-    def add_random_walls(self, chance=0.2):
+    def add_random_walls(self, chance=0.15):
         # create list of points
         points = []
         for x in range(2, self.width - 1, 2):
@@ -197,9 +197,9 @@ class Level:
 
     # get up to 4 random locations in different corners of the map
     def get_random_locations_in_corners(self, points_amount=4):
-        quadrant_w, quadrant_h = self.width // 4, self.height // 4
-        x_right = (self.width * 3) // 4 - 1
-        y_bottom = (self.height * 3) // 4 - 1
+        quadrant_w, quadrant_h = self.width // 3, self.height // 3
+        x_right = (self.width * 2) // 3 - 1
+        y_bottom = (self.height * 2) // 3 - 1
         quadrant_topleft_points = [(1, 1), (1, x_right), (y_bottom, 1), (y_bottom, x_right)]
         points = []
         for qy, qx in quadrant_topleft_points:
@@ -378,6 +378,7 @@ class GameState:
             # don't allow backtracking
             if self.move_here:
                 if not self.picked_coin_now and GameState.is_direction_opposite(direction, self.move_here):
+                # if GameState.is_direction_opposite(direction, self.move_here):
                     continue
             target_y = self.pacman_y + direction[0]
             target_x = self.pacman_x + direction[1]
@@ -402,8 +403,6 @@ class GameState:
     def pick_best_move(self, level, pacman):
         self.evaluate_children(level)
         #richest_leaf = self.get_richest_leaf()
-        #if self.pacman_y == 5 and (4 <= self.pacman_x <= 5):
-        #    useless_var = 12
         #return self.get_first_move_towards(richest_leaf)
         # search for the closest coin
         closest_coin_state = self.get_closest_coin_state()
@@ -472,7 +471,7 @@ class GameState:
         return False
 
     # check if a ghost is in range of pacman
-    def check_collision(self, ghost, clear_range=1.5):
+    def check_collision(self, ghost, clear_range=1.2):
         ghost_y = ghost.tile_y + ghost.move_dir[0] * ghost.move_progress / ghost.move_frames
         ghost_x = ghost.tile_x + ghost.move_dir[1] * ghost.move_progress / ghost.move_frames
         px, py = self.pacman_x, self.pacman_y
@@ -502,8 +501,8 @@ class GameState:
         while ghost.move_progress >= ghost.move_frames:  # move as time passes
             ghost.tile_y += ghost.move_dir[0]
             ghost.tile_x += ghost.move_dir[1]
-            if not ghost.move_dir:  # pick a good move
-                ghost.move_dir = self.pick_good_ghost_move(ghost, level)
+            # pick a good move
+            ghost.move_dir = self.pick_good_ghost_move(ghost, level)
             ghost.move_progress -= ghost.move_frames
         return ghost
 
