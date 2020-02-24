@@ -184,6 +184,33 @@ class Level:
         return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
 
     def shortest_path_a_star(self, x1, y1, x2, y2):
+        get_adjacent = lambda y, x: [(y, x + 1), (y, x - 1), (y - 1, x), (y + 1, x)]  # right, left, up, down
+        distance_matrix = np.ones(self.tile_map.shape, dtype=int) * -1
+        # fill distance matrix
+        distance_matrix[y1, x1] = 0
+        tile_list = [(Level.manhattan_distance(self, x1, y1, x2, y2), y1, x1)]
+        #
+        while tile_list:
+            tile_list.sort()  # should be a priority queue
+            f, y, x = tile_list.pop(0)
+            if y == y2 and x == x2:
+                break  # target reached: early stop
+            # look at neigbours
+            directions = get_adjacent(y, x)
+            for dir_y, dir_x in directions:
+                if self.tile_map[dir_y, dir_x] == 0:  # check corridor
+                    dist = distance_matrix[y, x] + 1
+                    heur = Level.manhattan_distance(self, dir_x, dir_y, x2, y2)
+                    curr_f = dist + heur
+                    if distance_matrix[dir_y, dir_x] == -1 or dist < distance_matrix[dir_y, dir_x]:
+                        distance_matrix[dir_y, dir_x] = dist
+                        tile_list.append((curr_f, dir_y, dir_x))
+        return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
+
+    @staticmethod
+    def manhattan_distance(self, x1, y1, x2, y2):
+        return int(abs(x2 - x1) + abs(y2 - y1))
+    def shortest_path_greedy(self, x1, y1, x2, y2):
         pass
 
     def add_ghosts(self):
@@ -285,7 +312,7 @@ class PacMan(Character):
         # being eaten by ghosts
         self.dead = False
 
-    def update(self, level):
+    def update(self, level,game_mode):
         if self.dead:  # dead men tell no tales
             return
         self.move()
@@ -299,7 +326,15 @@ class PacMan(Character):
                     coin.kill()  # devour the coin
                     level.score += 10  # claim some points
             if level.coins:
-                self.planned_moves = [self.choose_best_move(level)]
+                if game_mode == "Game":
+                    self.planned_moves = [self.choose_best_move(level)]
+                elif game_mode == "Pathfinding":
+                    coin = None
+                    for c in level.coins:  # choose first coin as target
+                        coin = c
+                        break
+                    self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
+                                                                  coin.tile_x, coin.tile_y)
             #    else:  # try to reach the coin
             #        #self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
             #        #                                              coin.tile_x, coin.tile_y)
@@ -376,7 +411,7 @@ class GameState:
         new_ghosts = self.simulate_ghosts_movement(level)
         # find valid moves
         directions = [(0, 1), (0, -1), (-1, 0), (1, 0)]
-        for direction in directions:
+        for direction in directions: 
             # don't allow backtracking
             if self.move_here:
                 if not self.picked_coin_now and GameState.is_direction_opposite(direction, self.move_here):
