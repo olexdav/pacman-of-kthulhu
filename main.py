@@ -3,6 +3,8 @@ import pygame
 import pygame.freetype
 import sympy
 import Source.game as game
+from datetime import datetime
+from datetime import timedelta
 
 LEVEL_WIDTH = 9
 LEVEL_HEIGHT = 9
@@ -19,12 +21,33 @@ def draw_score(screen, score):
     screen.blit(text, text_rect)
 
 
-def draw_floating_label(screen, animation_progress, text, color, font_size):
+def draw_floating_label(screen, animation_progress, string, color, font_size):
     height, width = pygame.display.get_surface().get_size()
     font = pygame.freetype.Font("Assets/Fonts/PokemonGb.ttf", font_size)
-    text, text_rect = font.render(text, color)
+    text, text_rect = font.render(string, color)
     y = -int(sympy.cot(0.001+animation_progress*3.15)*40) + height // 2
     text_rect.center = width // 2, y
+    screen.blit(text, text_rect)
+
+
+def draw_pathfinding_stats(screen, stats):
+    font = pygame.freetype.Font("Assets/Fonts/PokemonGb.ttf", 16)
+    time = datetime.min + stats['time']
+    color = (255, 255, 255)
+    time_str = f"Time (ss.mcs) {time.strftime('%S.%f')}"
+    text, text_rect = font.render(time_str, color)
+    text_rect.left = 0
+    text_rect.top = 50
+    screen.blit(text, text_rect)
+    steps_str = f"Steps: {stats['steps']}"
+    text, text_rect = font.render(steps_str, color)
+    text_rect.left = 0
+    text_rect.top = 75
+    screen.blit(text, text_rect)
+    memory_str = f"Memory: {stats['memory']} Bytes"
+    text, text_rect = font.render(memory_str, color)
+    text_rect.left = 0
+    text_rect.top = 100
     screen.blit(text, text_rect)
 
 
@@ -68,6 +91,7 @@ def main():
 
     # create level
     level, pacman, pacman_list, tile_list = create_level(current_difficulty)
+    pathfinding_stats = {"time": timedelta(microseconds=0), "steps": 0, "memory": 0}  # stats about pathfinding algorithms
 
     # game clock
     clock = pygame.time.Clock()
@@ -98,7 +122,7 @@ def main():
         # update game logic
         if not pause:
             if game_state == "running":
-                pacman.update(level, GAME_MODE)
+                pacman.update(level, GAME_MODE, pathfinding_stats)
                 level.ghosts.update(level, pacman)
                 level.update()
                 if not level.coins and GAME_MODE == "Game":  # win the game once all of the coins have been eaten
@@ -134,6 +158,8 @@ def main():
         pacman_list.draw(screen)
         level.ghosts.draw(screen)
         draw_score(screen, level.score)
+        if GAME_MODE == "Pathfinding":
+            draw_pathfinding_stats(screen, pathfinding_stats)
         animation_progress = floating_text_animation_frame / floating_text_animation_frames
         if game_state == "victory":
             label_text = f"Onwards to level {current_difficulty}!"

@@ -2,6 +2,8 @@ import os
 import numpy as np
 import random
 import pygame
+import time
+from datetime import datetime
 
 TILE_SIZE = 60
 PACMAN_MOVE_FRAMES = 20
@@ -144,8 +146,12 @@ class Level:
         return tile_list
 
     # find shortest path between two points and return a sequence of moves
-    def find_shortest_path(self, x1, y1, x2, y2):
-        return self.shortest_path_bfs(x1, y1, x2, y2)
+    def find_shortest_path(self, x1, y1, x2, y2, pathfinding_stats):
+        startTime = datetime.now()
+        shortest_path = self.shortest_path_dfs(x1, y1, x2, y2, pathfinding_stats)
+        timeElapsed = datetime.now() - startTime
+        pathfinding_stats["time"] = timeElapsed
+        return shortest_path
 
     # return moves that need to be taken to reach a point based on a distance matrix
     @staticmethod
@@ -166,14 +172,21 @@ class Level:
         moves.reverse()
         return moves
 
-    def shortest_path_bfs(self, x1, y1, x2, y2):
+    def shortest_path_bfs(self, x1, y1, x2, y2, pathfinding_stats):
         get_adjacent = lambda y, x: [(y, x + 1), (y, x - 1), (y - 1, x), (y + 1, x)]  # right, left, up, down
         distance_matrix = np.ones(self.tile_map.shape, dtype=int) * -1
         # fill distance matrix
         distance_matrix[y1, x1] = 0
         queue = [(y1, x1)]
+        steps_taken = 0
+        max_memory = 1
         while queue:
+            if len(queue) > max_memory:
+                max_memory = len(queue)
             y, x = queue.pop(0)
+            steps_taken += 1
+            if y == y2 and x == x2:
+                break  # target reached: early stop
             directions = get_adjacent(y, x)
             for dir_y, dir_x in directions:
                 if self.tile_map[dir_y, dir_x] == 0:
@@ -181,6 +194,32 @@ class Level:
                     if distance_matrix[dir_y, dir_x] == -1 or dist < distance_matrix[dir_y, dir_x]:
                         distance_matrix[dir_y, dir_x] = dist
                         queue.append((dir_y, dir_x))
+        pathfinding_stats['steps'] = steps_taken
+        pathfinding_stats['memory'] = max_memory * 8
+        return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
+
+    def shortest_path_dfs(self, x1, y1, x2, y2, pathfinding_stats):
+        get_adjacent = lambda y, x: [(y, x + 1), (y, x - 1), (y - 1, x), (y + 1, x)]  # right, left, up, down
+        distance_matrix = np.ones(self.tile_map.shape, dtype=int) * -1
+        # fill distance matrix
+        distance_matrix[y1, x1] = 0
+        stack = [(y1, x1)]
+        steps_taken = 0
+        max_memory = 1
+        while stack:
+            if len(stack) > max_memory:
+                max_memory = len(stack)
+            y, x = stack.pop()
+            steps_taken += 1
+            directions = get_adjacent(y, x)
+            for dir_y, dir_x in directions:
+                if self.tile_map[dir_y, dir_x] == 0:
+                    dist = distance_matrix[y, x] + 1
+                    if distance_matrix[dir_y, dir_x] == -1 or dist < distance_matrix[dir_y, dir_x]:
+                        distance_matrix[dir_y, dir_x] = dist
+                        stack.append((dir_y, dir_x))
+        pathfinding_stats['steps'] = steps_taken
+        pathfinding_stats['memory'] = max_memory * 8
         return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
 
     def shortest_path_a_star(self, x1, y1, x2, y2):
@@ -312,7 +351,7 @@ class PacMan(Character):
         # being eaten by ghosts
         self.dead = False
 
-    def update(self, level,game_mode):
+    def update(self, level, game_mode, pathfinding_stats):
         if self.dead:  # dead men tell no tales
             return
         self.move()
@@ -326,19 +365,15 @@ class PacMan(Character):
                     coin.kill()  # devour the coin
                     level.score += 10  # claim some points
             if level.coins:
-                if game_mode == "Game":
+                if game_mode == "Game":  # move while avoiding ghosts
                     self.planned_moves = [self.choose_best_move(level)]
-                elif game_mode == "Pathfinding":
+                elif game_mode == "Pathfinding":  # just move towards coins
                     coin = None
                     for c in level.coins:  # choose first coin as target
                         coin = c
                         break
                     self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
-                                                                  coin.tile_x, coin.tile_y)
-            #    else:  # try to reach the coin
-            #        #self.planned_moves = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
-            #        #                                              coin.tile_x, coin.tile_y)
-            #        break  # only try to eat the first coin on the list (for now)
+                                                                  coin.tile_x, coin.tile_y, pathfinding_stats)
 
     def rotate_towards_direction(self, direction):
         angles = {(0, 1): 0, (0, -1): 180, (-1, 0): 90, (1, 0): 270}
