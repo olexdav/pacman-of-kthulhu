@@ -6,8 +6,8 @@ import Source.game as game
 
 LEVEL_WIDTH = 9
 LEVEL_HEIGHT = 9
-# GAME_MODE = "Pathfinding"
-GAME_MODE = "Game"
+GAME_MODE = "Pathfinding"
+#GAME_MODE = "Game"
 
 
 def draw_score(screen, score):
@@ -98,7 +98,7 @@ def main():
         # update game logic
         if not pause:
             if game_state == "running":
-                pacman.update(level)
+                pacman.update(level, GAME_MODE)
                 level.ghosts.update(level, pacman)
                 level.update()
                 if not level.coins and GAME_MODE == "Game":  # win the game once all of the coins have been eaten
