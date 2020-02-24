@@ -55,6 +55,9 @@ class Level:
             self.add_ghosts()
             self.place_coins()
         self.score = 0
+        #  pathfinding
+        self.pathfinding_algos = ['bfs', 'dfs']
+        self.pathfinding_algo_id = 0
 
     def update(self):
         self.coins.update()
@@ -145,10 +148,21 @@ class Level:
                 tile_list.add(Tile(tile_type, x, y))
         return tile_list
 
+    def toggle_pathfinding_algo(self):  # select next pathfinding algo in the list
+        self.pathfinding_algo_id += 1
+        if self.pathfinding_algo_id >= len(self.pathfinding_algos):
+            self.pathfinding_algo_id = 0
+
     # find shortest path between two points and return a sequence of moves
     def find_shortest_path(self, x1, y1, x2, y2, pathfinding_stats):
+        pathfinding_algo = self.pathfinding_algos[self.pathfinding_algo_id]
+        pathfinding_stats["algo"] = pathfinding_algo
         startTime = datetime.now()
-        shortest_path = self.shortest_path_dfs(x1, y1, x2, y2, pathfinding_stats)
+        shortest_path = []
+        if pathfinding_algo == "bfs":
+            shortest_path = self.shortest_path_bfs(x1, y1, x2, y2, pathfinding_stats)
+        elif pathfinding_algo == "dfs":
+            shortest_path = self.shortest_path_dfs(x1, y1, x2, y2, pathfinding_stats)
         timeElapsed = datetime.now() - startTime
         pathfinding_stats["time"] = timeElapsed
         return shortest_path

@@ -34,20 +34,25 @@ def draw_pathfinding_stats(screen, stats):
     font = pygame.freetype.Font("Assets/Fonts/PokemonGb.ttf", 16)
     time = datetime.min + stats['time']
     color = (255, 255, 255)
+    algo_str = f"Algorithm: {stats['algo']}"
+    text, text_rect = font.render(algo_str, color)
+    text_rect.left = 0
+    text_rect.top = 55
+    screen.blit(text, text_rect)
     time_str = f"Time (ss.mcs) {time.strftime('%S.%f')}"
     text, text_rect = font.render(time_str, color)
     text_rect.left = 0
-    text_rect.top = 50
+    text_rect.top = 80
     screen.blit(text, text_rect)
     steps_str = f"Steps: {stats['steps']}"
     text, text_rect = font.render(steps_str, color)
     text_rect.left = 0
-    text_rect.top = 75
+    text_rect.top = 105
     screen.blit(text, text_rect)
     memory_str = f"Memory: {stats['memory']} Bytes"
     text, text_rect = font.render(memory_str, color)
     text_rect.left = 0
-    text_rect.top = 100
+    text_rect.top = 130
     screen.blit(text, text_rect)
 
 
@@ -91,7 +96,8 @@ def main():
 
     # create level
     level, pacman, pacman_list, tile_list = create_level(current_difficulty)
-    pathfinding_stats = {"time": timedelta(microseconds=0), "steps": 0, "memory": 0}  # stats about pathfinding algorithms
+    pathfinding_stats = {"algo": "bfs", "time": timedelta(microseconds=0),
+                         "steps": 0, "memory": 0}  # stats about pathfinding algorithms
 
     # game clock
     clock = pygame.time.Clock()
@@ -117,7 +123,9 @@ def main():
                     level.add_coin(tile_x, tile_y)
                 # clicked_tiles = [s for s in tile_list if s.rect.collidepoint(mouse_pos)]
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                pause = not pause
+                pause = not pause  # pause/unpause
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+                level.toggle_pathfinding_algo()  # switch to next pathfinding algorithm
 
         # update game logic
         if not pause:
