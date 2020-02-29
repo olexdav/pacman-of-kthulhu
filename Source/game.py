@@ -56,7 +56,7 @@ class Level:
             self.place_coins()
         self.score = 0
         #  pathfinding
-        self.pathfinding_algos = ['bfs', 'dfs']
+        self.pathfinding_algos = ['bfs', 'dfs', 'a-star', 'greedy']
         self.pathfinding_algo_id = 0
 
     def update(self):
@@ -156,15 +156,21 @@ class Level:
     # find shortest path between two points and return a sequence of moves
     def find_shortest_path(self, x1, y1, x2, y2, pathfinding_stats):
         pathfinding_algo = self.pathfinding_algos[self.pathfinding_algo_id]
-        pathfinding_stats["algo"] = pathfinding_algo
+        if pathfinding_stats:
+            pathfinding_stats["algo"] = pathfinding_algo
         startTime = datetime.now()
         shortest_path = []
         if pathfinding_algo == "bfs":
             shortest_path = self.shortest_path_bfs(x1, y1, x2, y2, pathfinding_stats)
         elif pathfinding_algo == "dfs":
             shortest_path = self.shortest_path_dfs(x1, y1, x2, y2, pathfinding_stats)
+        elif pathfinding_algo == "a-star":
+            shortest_path = self.shortest_path_a_star(x1, y1, x2, y2, pathfinding_stats)
+        elif pathfinding_algo == "greedy":
+            shortest_path = self.shortest_path_greedy(x1, y1, x2, y2, pathfinding_stats)
         timeElapsed = datetime.now() - startTime
-        pathfinding_stats["time"] = timeElapsed
+        if pathfinding_stats:
+            pathfinding_stats["time"] = timeElapsed
         return shortest_path
 
     # return moves that need to be taken to reach a point based on a distance matrix
@@ -208,8 +214,9 @@ class Level:
                     if distance_matrix[dir_y, dir_x] == -1 or dist < distance_matrix[dir_y, dir_x]:
                         distance_matrix[dir_y, dir_x] = dist
                         queue.append((dir_y, dir_x))
-        pathfinding_stats['steps'] = steps_taken
-        pathfinding_stats['memory'] = max_memory * 8
+        if pathfinding_stats:
+            pathfinding_stats['steps'] = steps_taken
+            pathfinding_stats['memory'] = max_memory * 8
         return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
 
     def shortest_path_dfs(self, x1, y1, x2, y2, pathfinding_stats):
@@ -232,20 +239,25 @@ class Level:
                     if distance_matrix[dir_y, dir_x] == -1 or dist < distance_matrix[dir_y, dir_x]:
                         distance_matrix[dir_y, dir_x] = dist
                         stack.append((dir_y, dir_x))
-        pathfinding_stats['steps'] = steps_taken
-        pathfinding_stats['memory'] = max_memory * 8
+        if pathfinding_stats:
+            pathfinding_stats['steps'] = steps_taken
+            pathfinding_stats['memory'] = max_memory * 8
         return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
 
-    def shortest_path_a_star(self, x1, y1, x2, y2):
+    def shortest_path_a_star(self, x1, y1, x2, y2, pathfinding_stats):
         get_adjacent = lambda y, x: [(y, x + 1), (y, x - 1), (y - 1, x), (y + 1, x)]  # right, left, up, down
         distance_matrix = np.ones(self.tile_map.shape, dtype=int) * -1
         # fill distance matrix
         distance_matrix[y1, x1] = 0
         tile_list = [(Level.manhattan_distance(self, x1, y1, x2, y2), y1, x1)]
-        #
+        steps_taken = 0
+        max_memory = 1
         while tile_list:
+            if len(tile_list) > max_memory:
+                max_memory = len(tile_list)
             tile_list.sort()  # should be a priority queue
             f, y, x = tile_list.pop(0)
+            steps_taken += 1
             if y == y2 and x == x2:
                 break  # target reached: early stop
             # look at neigbours
@@ -258,13 +270,49 @@ class Level:
                     if distance_matrix[dir_y, dir_x] == -1 or dist < distance_matrix[dir_y, dir_x]:
                         distance_matrix[dir_y, dir_x] = dist
                         tile_list.append((curr_f, dir_y, dir_x))
+        if pathfinding_stats:  # record pathfinding stats
+            pathfinding_stats['steps'] = steps_taken
+            pathfinding_stats['memory'] = max_memory * 8
+        return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
+
+    def shortest_path_greedy(self, x1, y1, x2, y2, pathfinding_stats):
+        get_adjacent = lambda y, x: [(y, x + 1), (y, x - 1), (y - 1, x), (y + 1, x)]  # right, left, up, down
+        distance_matrix = np.ones(self.tile_map.shape, dtype=int) * -1
+        # fill distance matrix
+        distance_matrix[y1, x1] = 0
+        tile_list = [(Level.euclidean_distance(self, x1, y1, x2, y2), y1, x1)]
+        steps_taken = 0
+        max_memory = 1
+        while tile_list:
+            if len(tile_list) > max_memory:
+                max_memory = len(tile_list)
+            tile_list.sort()  # should be a priority queue
+            f, y, x = tile_list.pop(0)
+            steps_taken += 1
+            if y == y2 and x == x2:
+                break  # target reached: early stop
+            # look at neigbours
+            directions = get_adjacent(y, x)
+            for dir_y, dir_x in directions:
+                if self.tile_map[dir_y, dir_x] == 0:  # check corridor
+                    dist = distance_matrix[y, x] + 1
+                    heur = Level.euclidean_distance(self, dir_x, dir_y, x2, y2)
+                    curr_f = dist + heur
+                    if distance_matrix[dir_y, dir_x] == -1 or dist < distance_matrix[dir_y, dir_x]:
+                        distance_matrix[dir_y, dir_x] = dist
+                        tile_list.append((curr_f, dir_y, dir_x))
+        if pathfinding_stats:  # record pathfinding stats
+            pathfinding_stats['steps'] = steps_taken
+            pathfinding_stats['memory'] = max_memory * 8
         return Level.moves_from_distance_matrix(x1, y1, x2, y2, distance_matrix)
 
     @staticmethod
     def manhattan_distance(self, x1, y1, x2, y2):
         return int(abs(x2 - x1) + abs(y2 - y1))
-    def shortest_path_greedy(self, x1, y1, x2, y2):
-        pass
+
+    @staticmethod
+    def euclidean_distance(self, x1, y1, x2, y2):
+        return ((x1-x2)**2 + (y1-y2)**2)**0.5
 
     def add_ghosts(self):
         params = difficulty_settings[self.difficulty]
@@ -594,7 +642,7 @@ class GameState:
 
     def pick_good_ghost_move(self, ghost, level):
         path_moves = level.find_shortest_path(ghost.tile_x, ghost.tile_y,
-                                              self.pacman_x, self.pacman_y)
+                                              self.pacman_x, self.pacman_y, None)
         return path_moves[0]
 
 
@@ -648,7 +696,7 @@ class Ghost(Character):
         else:  # pursue pacman
             pacman_x, pacman_y = pacman.curr_tile_x, pacman.curr_tile_y
             moves_to_pacman = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
-                                                       pacman_x, pacman_y)
+                                                       pacman_x, pacman_y, None)
             if moves_to_pacman:
                 return moves_to_pacman[0]
 

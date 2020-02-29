@@ -9,7 +9,7 @@ from datetime import timedelta
 LEVEL_WIDTH = 9
 LEVEL_HEIGHT = 9
 GAME_MODE = "Pathfinding"
-#GAME_MODE = "Game"
+# GAME_MODE = "Game"
 
 
 def draw_score(screen, score):
