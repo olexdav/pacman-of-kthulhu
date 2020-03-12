@@ -8,7 +8,7 @@ from datetime import datetime
 TILE_SIZE = 60
 PACMAN_MOVE_FRAMES = 20
 PACMAN_AI_DEPTH = 8
-
+GHOST_AI_DEPTH = 20
 
 # parameters that dictate how hard the game becomes at each difficulty level
 difficulty_settings = {
@@ -152,6 +152,10 @@ class Level:
         self.pathfinding_algo_id += 1
         if self.pathfinding_algo_id >= len(self.pathfinding_algos):
             self.pathfinding_algo_id = 0
+
+    def shortest_path_length(self, x1, y1, x2, y2):
+        path = self.find_shortest_path(x1, y1, x2, y2, {})
+        return len(path)
 
     # find shortest path between two points and return a sequence of moves
     def find_shortest_path(self, x1, y1, x2, y2, pathfinding_stats):
@@ -695,10 +699,19 @@ class Ghost(Character):
             return random.choice(possible_moves)
         else:  # pursue pacman
             pacman_x, pacman_y = pacman.curr_tile_x, pacman.curr_tile_y
-            moves_to_pacman = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
-                                                       pacman_x, pacman_y, None)
-            if moves_to_pacman:
-                return moves_to_pacman[0]
+            #moves_to_pacman = level.find_shortest_path(self.curr_tile_x, self.curr_tile_y,
+            #                                           pacman_x, pacman_y, None)
+            #if moves_to_pacman:
+            #    return moves_to_pacman[0]
+            return self.choose_best_move(level, pacman)
+
+    def choose_best_move(self, level, pacman):
+        # fetch current game state
+        dist_to_pacman = level.shortest_path_length(pacman.curr_tile_x, pacman.curr_tile_y,
+                                                    self.curr_tile_x, self.curr_tile_y)
+        curr_state = GhostGameState(dist_to_pacman, None, pacman.curr_tile_x, pacman.curr_tile_y,
+                                    self.curr_tile_x, self.curr_tile_y, 0)
+        return curr_state.get_best_move(level)
 
 
 class Coin(pygame.sprite.Sprite):
@@ -728,3 +741,39 @@ class Coin(pygame.sprite.Sprite):
             self.current_frame = 0
             self.index = (self.index + 1) % len(self.images)
             self.image = self.images[self.index]
+
+
+class GhostGameState:
+    def __init__(self, dist_to_pacman, parent, pacman_x, pacman_y,
+                 ghost_x, ghost_y, depth=0, move_here=None):
+        self.dist_to_pacman = dist_to_pacman
+        self.parent = parent
+        self.children = []
+        self.pacman_x, self.pacman_y = pacman_x, pacman_y
+        self.ghost_x, self.ghost_y = ghost_x, ghost_y
+        self.depth = depth
+        self.move_here = move_here
+
+    def evaluate_children(self, level):
+        if self.depth >= GHOST_AI_DEPTH:
+            return
+        # find valid moves
+        directions = [(0, 1), (0, -1), (-1, 0), (1, 0)]
+        for direction in directions:
+            target_y = self.ghost_y + direction[0]
+            target_x = self.ghost_x + direction[1]
+            if level.tile_map[target_y, target_x] == 0:  # move only through corridors
+                # calculate distance to pacman
+                new_dist = level.shortest_path_length(target_x, target_y,
+                                                      self.pacman_x, self.pacman_y)
+                if new_dist < self.dist_to_pacman:
+                    new_state = GhostGameState(new_dist, self, self.pacman_x, self.pacman_y,
+                                               target_x, target_y, self.depth + 1, direction)
+                    new_state.evaluate_children(level)  # evaluate a new state recursively
+                    self.children.append(new_state)
+
+    def get_best_move(self, level):
+        self.evaluate_children(level)
+        # choose first child
+        if self.children:
+            return self.children[0].move_here
